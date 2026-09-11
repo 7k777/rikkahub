@@ -71,6 +71,25 @@ jobs:
                     "other_platform_oauth_client": []
                   }
                 }
+              },
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:1111111111111111111111",
+                  "android_client_info": {
+                    "package_name": "me.rerere.rikkahub.debug"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
               }
             ],
             "configuration_version": "1"
@@ -89,8 +108,17 @@ jobs:
 
       - name: Build debug APK
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Show failure summary
+        if: failure()
+        run: |
+          echo "=========== WHAT WENT WRONG ==========="
+          grep -A 20 "What went wrong" gradle-build.log || echo "(no 'What went wrong' section found)"
+          echo "=========== FAILED TASKS ==========="
+          grep -A 8 "Execution failed for task" gradle-build.log || true
 
       - name: Upload artifact
         if: always()
