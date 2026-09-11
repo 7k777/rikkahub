@@ -39,6 +39,10 @@
   <string name="assistant_importer_unsupported_file_type">不支持的文件类型: %s</string>
   <string name="assistant_importer_unsupported_spec">不支持的规格: %s</string>
   <string name="assistant_page_actions">操作</string>
+  <string name="assistant_page_split_bubble_by_line_title">按行拆分气泡</string>
+  <string name="assistant_page_split_bubble_by_line_desc">把助手回复按模型自己写的换行拆成多个独立气泡发送</string>
+  <string name="assistant_page_split_user_bubble_by_line_title">用户消息按行拆分气泡</string>
+  <string name="assistant_page_split_user_bubble_by_line_desc">把你发送的消息按换行拆成多个独立气泡显示</string>
   <string name="assistant_page_add">添加</string>
   <string name="assistant_page_add_body">添加 Body</string>
   <string name="assistant_page_add_header">添加 Header</string>

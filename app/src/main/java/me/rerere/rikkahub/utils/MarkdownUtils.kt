@@ -52,3 +52,94 @@ fun String.extractThinkingTitle(): String? {
 
     return null
 }
+
+// ============================================================
+// 分气泡: 按模型自己写的换行 (\n) 把一条回复拆成多个气泡片段
+// ============================================================
+
+/**
+ * 围栏代码块 (```...```)，内部的换行必须原样保留，不能被当作气泡边界。
+ */
+private val FENCED_CODE_BLOCK_REGEX = Regex("```[\\s\\S]*?```")
+
+/**
+ * 找出文本中「不可在其内部拆分气泡」的字符区间：
+ * 1. 围栏代码块 (```...```) —— 内部换行是代码的一部分，拆开代码就碎了
+ * 2. Markdown 表格 —— 连续 2 行及以上、每行都形如 "|...|" 的区块，拆开表格就散架了
+ *
+ * 除了这两种情况，其余所有换行完全由模型自己写、自己控制，不做任何额外的"智能分段"。
+ */
+private fun findProtectedRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+
+    // 1. 围栏代码块
+    FENCED_CODE_BLOCK_REGEX.findAll(text).forEach { ranges.add(it.range) }
+
+    // 2. Markdown 表格块
+    fun isTableRow(line: String): Boolean {
+        val trimmed = line.trim()
+        return trimmed.length > 1 && trimmed.startsWith("|") && trimmed.endsWith("|")
+    }
+
+    val lines = text.lines()
+    var lineStartOffset = 0
+    var tableStartLineIndex = -1
+    var tableStartOffset = 0
+
+    lines.forEachIndexed { index, line ->
+        if (isTableRow(line)) {
+            if (tableStartLineIndex == -1) {
+                tableStartLineIndex = index
+                tableStartOffset = lineStartOffset
+            }
+        } else {
+            if (tableStartLineIndex != -1 && index - tableStartLineIndex >= 2) {
+                // 表格至少需要 2 行 (表头 + 分隔行)，才当作一张完整表格保护起来
+                ranges.add(tableStartOffset until (lineStartOffset - 1).coerceAtLeast(tableStartOffset))
+            }
+            tableStartLineIndex = -1
+        }
+        lineStartOffset += line.length + 1 // +1 计入被 lines() 消费掉的那个 '\n'
+    }
+    // 文本结尾仍处于表格中 (没有后续非表格行来"关闭"它)
+    if (tableStartLineIndex != -1 && lines.size - tableStartLineIndex >= 2) {
+        ranges.add(tableStartOffset until text.length)
+    }
+
+    return ranges
+}
+
+/**
+ * 按模型自己写的换行符 (\n) 把一条回复拆分成多个"气泡"片段。
+ *
+ * - 拆分边界 100% 由模型输出的换行决定，客户端不做任何"按句子/按段落"的猜测式加工。
+ * - 唯一的保护：围栏代码块与 Markdown 表格内部的换行不会被当作气泡边界（见 [findProtectedRanges]）。
+ * - 拆分后每个片段会 trim 首尾空白；纯空白片段会被丢弃。
+ * - 如果拆分结果为空 (例如整段文本都在保护区间内)，回退为把原文整体作为唯一一个片段返回，
+ *   保证调用方任何时候都能拿到至少一个片段。
+ */
+fun String.splitIntoBubbleSegments(): List<String> {
+    if (isBlank()) return listOf(this)
+
+    val protectedRanges = findProtectedRanges(this)
+    fun isProtectedIndex(index: Int) = protectedRanges.any { index in it }
+
+    val segments = mutableListOf<String>()
+    val current = StringBuilder()
+    for (index in indices) {
+        val ch = this[index]
+        if (ch == '\n' && !isProtectedIndex(index)) {
+            segments.add(current.toString())
+            current.clear()
+        } else {
+            current.append(ch)
+        }
+    }
+    segments.add(current.toString())
+
+    val result = segments
+        .map { it.trim('\r').trim() }
+        .filter { it.isNotBlank() }
+
+    return result.ifEmpty { listOf(this.trim()) }
+}

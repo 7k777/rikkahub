@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import me.rerere.rikkahub.utils.splitIntoBubbleSegments
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -365,25 +366,98 @@ private fun MessagePartsBlock(
                     is UIMessagePart.Text -> {
                         val textContent = @Composable {
                             if (role == MessageRole.USER) {
-                                Surface(
-                                    modifier = Modifier.animateContentSize(),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = settings.displaySetting.bubbleOpacity),
-                                    onClick = { onUserMessageClick?.invoke() },
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        MarkdownBlock(
-                                            content = part.text.replaceRegexes(
-                                                assistant = assistant,
-                                                scope = AssistantAffectScope.USER,
-                                                visual = true,
-                                            ),
-                                            onClickCitation = handleClickCitation
-                                        )
+                                if (assistant?.splitUserBubbleByLine == true && !loading) {
+                                    // 分气泡: 把用户消息按换行拆成多个独立气泡
+                                    val userSegments = remember(part.text) {
+                                        part.text.splitIntoBubbleSegments()
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        userSegments.forEachIndexed { segIndex, segment ->
+                                            key("user-seg-$segIndex") {
+                                                Surface(
+                                                    modifier = Modifier.animateContentSize(),
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = settings.displaySetting.bubbleOpacity),
+                                                    onClick = { onUserMessageClick?.invoke() },
+                                                ) {
+                                                    Column(modifier = Modifier.padding(8.dp)) {
+                                                        MarkdownBlock(
+                                                            content = segment.replaceRegexes(
+                                                                assistant = assistant,
+                                                                scope = AssistantAffectScope.USER,
+                                                                visual = true,
+                                                            ),
+                                                            onClickCitation = handleClickCitation
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Surface(
+                                        modifier = Modifier.animateContentSize(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = settings.displaySetting.bubbleOpacity),
+                                        onClick = { onUserMessageClick?.invoke() },
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            MarkdownBlock(
+                                                content = part.text.replaceRegexes(
+                                                    assistant = assistant,
+                                                    scope = AssistantAffectScope.USER,
+                                                    visual = true,
+                                                ),
+                                                onClickCitation = handleClickCitation
+                                            )
+                                        }
                                     }
                                 }
                             } else {
-                                if (settings.displaySetting.showAssistantBubble) {
+                                if (assistant?.splitBubbleByLine == true && !loading) {
+                                    // 分气泡: 按模型自己写的换行拆成多个独立气泡
+                                    // (代码块/表格内部的换行由 splitIntoBubbleSegments 保护, 不会被拆开)
+                                    val bubbleSegments = remember(part.text) {
+                                        part.text.splitIntoBubbleSegments()
+                                    }
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        bubbleSegments.forEachIndexed { segIndex, segment ->
+                                            key("ai-seg-$segIndex") {
+                                                if (settings.displaySetting.showAssistantBubble) {
+                                                    Surface(
+                                                        modifier = Modifier.animateContentSize(),
+                                                        shape = RoundedCornerShape(16.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = settings.displaySetting.bubbleOpacity),
+                                                    ) {
+                                                        Column(modifier = Modifier.padding(8.dp)) {
+                                                            MarkdownBlock(
+                                                                content = segment.replaceRegexes(
+                                                                    assistant = assistant,
+                                                                    scope = AssistantAffectScope.ASSISTANT,
+                                                                    visual = true,
+                                                                ),
+                                                                onClickCitation = handleClickCitation,
+                                                            )
+                                                        }
+                                                    }
+                                                } else {
+                                                    MarkdownBlock(
+                                                        content = segment.replaceRegexes(
+                                                            assistant = assistant,
+                                                            scope = AssistantAffectScope.ASSISTANT,
+                                                            visual = true,
+                                                        ),
+                                                        onClickCitation = handleClickCitation,
+                                                        modifier = Modifier
+                                                            .animateContentSize()
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else if (settings.displaySetting.showAssistantBubble) {
                                     Surface(
                                         modifier = Modifier.animateContentSize(),
                                         shape = RoundedCornerShape(16.dp),
