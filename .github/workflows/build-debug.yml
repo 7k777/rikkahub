@@ -1,0 +1,115 @@
+name: Build Debug APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'rikkahub-debug.apk'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web-ui/pnpm-lock.yaml
+
+      - name: Install web-ui dependencies
+        working-directory: web-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Write placeholder google-services.json
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "rikkahub-ci",
+              "storage_bucket": "rikkahub-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": {
+                    "package_name": "me.rerere.rikkahub"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rikkahub-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Push APK to builds branch
+        if: success()
+        run: |
+          set -e
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$APK" rikkahub-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan builds-new
+          git rm -rf --cached . -q || true
+          git add -f rikkahub-debug.apk
+          git commit -q -m "build: debug apk ($(date -u '+%Y-%m-%d %H:%M UTC') @ ${GITHUB_SHA::7})"
+          git push -f origin builds-new:builds
