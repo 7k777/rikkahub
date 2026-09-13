@@ -106,6 +106,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Restore fixed debug keystore
+        run: |
+          mkdir -p ~/.android
+          base64 -d .github/debug-keystore.b64 > ~/.android/debug.keystore
+          keytool -list -keystore ~/.android/debug.keystore -storepass android | head -3
+
       - name: Build debug APK
         run: |
           set -o pipefail
