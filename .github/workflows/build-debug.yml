@@ -116,10 +116,10 @@ jobs:
           base64 -d .github/debug-keystore.b64 > ~/.android/debug.keystore
           keytool -list -keystore ~/.android/debug.keystore -storepass android | head -3
 
-      - name: Restore release keystore
+      - name: Restore signing keystore
         run: |
-          base64 -d .github/cove-release.jks.b64 > app/cove-release.jks
-          printf 'storeFile=cove-release.jks\nstorePassword=cove77love\nkeyAlias=cove\nkeyPassword=cove77love\n' > local.properties
+          base64 -d .github/debug-keystore.b64 > app/cove-release.jks
+          printf 'storeFile=cove-release.jks\nstorePassword=android\nkeyAlias=androiddebugkey\nkeyPassword=android\n' > local.properties
 
       - name: Build release APK
         run: |
