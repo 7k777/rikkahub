@@ -116,11 +116,16 @@ jobs:
           base64 -d .github/debug-keystore.b64 > ~/.android/debug.keystore
           keytool -list -keystore ~/.android/debug.keystore -storepass android | head -3
 
-      - name: Build debug APK
+      - name: Restore release keystore
+        run: |
+          base64 -d .github/cove-release.jks.b64 > app/cove-release.jks
+          printf 'storeFile=cove-release.jks\nstorePassword=cove77love\nkeyAlias=cove\nkeyPassword=cove77love\n' > local.properties
+
+      - name: Build release APK
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle-build.log
 
       - name: Show failure summary
         if: failure()
@@ -134,15 +139,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rikkahub-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: cove-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
 
       - name: Push APK to builds branch
         if: success()
         run: |
           set -e
-          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           cp "$APK" rikkahub-debug.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

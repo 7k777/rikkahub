@@ -71,6 +71,7 @@ android {
 
     buildTypes {
         release {
+            applicationIdSuffix = ".lin77"
             signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = true
